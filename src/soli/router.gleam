@@ -1,8 +1,6 @@
-import chaplin
-import gleam/float
 import gleam/http
-import gleam/int
-import gleam/result
+import lustre/element
+import soli/pages
 import soli/web
 import wisp.{type Request, type Response}
 
@@ -36,34 +34,21 @@ fn create_new_share(req: Request) -> Response {
 fn show_share(req: Request, id: String) -> Response {
   use <- wisp.require_method(req, http.Get)
   echo req
-  {
-    use template_file <- result.map(chaplin.compile_file("./pages/share.html"))
 
-    let rendered =
-      chaplin.render(template_file, [
-        #("id", chaplin.string(id)),
-        #("amount", chaplin.string(float.to_string(100.0))),
-      ])
+  let html =
+    pages.share(id, 100)
+    |> element.to_document_string
 
-    wisp.created()
-    |> wisp.html_body(rendered)
-  }
-  |> result.unwrap(wisp.internal_server_error())
+  wisp.created()
+  |> wisp.html_body(html)
 }
 
 fn home_page(req: Request) -> Response {
   use <- wisp.require_method(req, http.Get)
-  {
-    use template_file <- result.map(
-      chaplin.compile_file("./pages/index.html") |> echo,
-    )
+  let html =
+    pages.index()
+    |> element.to_document_string
 
-    let rendered =
-      chaplin.render(template_file, [])
-      |> echo
-
-    wisp.ok()
-    |> wisp.html_body(rendered)
-  }
-  |> result.unwrap(wisp.internal_server_error())
+  wisp.ok()
+  |> wisp.html_body(html)
 }
