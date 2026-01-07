@@ -1,7 +1,10 @@
 import gleam/erlang/process
 import gleam/io
+import gleam/otp/actor
+import gleam/otp/static_supervisor.{type Supervisor} as supervisor
 import mist
 import soli/router
+import soli/session_store
 import soli/web.{Context}
 import wisp
 import wisp/wisp_mist
@@ -15,7 +18,12 @@ pub fn main() -> Nil {
   // load this from somewhere so that it is not regenerated on every restart.
   let secret_key_base = wisp.random_string(64)
 
-  let ctx = Context(static_directory: static_directory())
+  let process_name = process.new_name("session_store")
+  let subject = process.named_subject(process_name)
+
+  let _ = start_supervisor(process_name)
+
+  let ctx = Context(static_directory: static_directory(), subject:)
 
   let handler = router.handle_request(_, ctx)
 
@@ -26,9 +34,15 @@ pub fn main() -> Nil {
     |> mist.port(8000)
     |> mist.start
 
-  // The web server runs in new Erlang process, so put this one to sleep while
-  // it works concurrently.
   process.sleep_forever()
+}
+
+fn start_supervisor(
+  process_name: process.Name(session_store.Message),
+) -> actor.StartResult(Supervisor) {
+  supervisor.new(supervisor.OneForOne)
+  |> supervisor.add(session_store.static_actor_child(process_name))
+  |> supervisor.start()
 }
 
 pub fn static_directory() -> String {
@@ -36,7 +50,7 @@ pub fn static_directory() -> String {
   // including static assets to be served.
   // This function returns an absolute path and works both in development and in
   // production after compilation.
-  let assert Ok(priv_directory) = wisp.priv_directory("soli_share") |> echo
+  let assert Ok(priv_directory) = wisp.priv_directory("soli_share")
 
   priv_directory <> "/static"
 }

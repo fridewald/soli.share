@@ -19,7 +19,7 @@ pub fn index() {
         ]),
         html.form([], [
           html.label([], [
-            html.text(" Amount "),
+            html.text(" Amount in cents"),
             html.input([
               attribute("aria-label", "Number"),
               attribute.placeholder("Amount"),
@@ -66,9 +66,22 @@ pub fn share(id: String, amount: Int) {
       html.main([attribute.id("main"), attribute.class("container")], [
         html.hgroup([], [
           html.h1([], [html.text("New soli share created")]),
-          html.p([], [html.text("Split group " <> int.to_string(amount))]),
+          html.p([], [html.text("Split " <> int.to_string(amount) <> " cents")]),
         ]),
         html.p([], [html.strong([], [html.text("Id: ")]), html.text(id)]),
+      ]),
+    ]),
+  ])
+}
+
+pub fn not_found() {
+  html.html([attribute.lang("en")], [
+    head(),
+    html.body([hx.boost(True)], [
+      html.main([attribute.id("main"), attribute.class("container")], [
+        html.hgroup([], [
+          html.h1([], [html.text("Not found")]),
+        ]),
       ]),
     ]),
   ])

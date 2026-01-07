@@ -1,7 +1,9 @@
+import soli/session_store
+import gleam/erlang/process
 import wisp
 
 pub type Context {
-  Context(static_directory: String)
+  Context(static_directory: String, subject: process.Subject(session_store.Message))
 }
 
 pub fn middleware(
