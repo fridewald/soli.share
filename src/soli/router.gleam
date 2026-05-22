@@ -52,7 +52,10 @@ fn show_share(
   let html =
     case session {
       Ok(session) -> pages.share(id, session.amount_in_cent)
-      Error(_) -> pages.not_found()
+      Error(err) -> {
+        echo err
+        pages.not_found()
+      }
     }
     |> element.to_document_string
 

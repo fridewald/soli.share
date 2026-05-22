@@ -30,8 +30,8 @@ pub fn index() {
           html.button(
             [
               hx.push_url(True),
-              hx.include(hx.CssSelector("#main")),
-              hx.target(hx.CssSelector("#main")),
+              hx.include(hx.Selector("#main")),
+              hx.target(hx.Selector("#main")),
               hx.post("/share/new"),
             ],
             [html.text(" Create soli share ")],
