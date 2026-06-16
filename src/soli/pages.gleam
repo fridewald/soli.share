@@ -1,13 +1,23 @@
+import formal/form.{type Form}
+import gleam/float
 import gleam/int
+import gleam/list
 import hx
 import lustre/attribute.{attribute}
 import lustre/element
 import lustre/element/html
+import lustre/element/keyed
+import soli/form as soli_form
+import soli/session_store
 
-pub fn index() {
+pub fn index(
+  form: Form(soli_form.CreateSession),
+  sessions: List(session_store.Session),
+) {
   html.html([attribute.lang("en")], [
     head(),
-    html.body([hx.boost(True)], [
+    html.body([], [
+      // html.body([hx.boost(True)], [
       html.main([attribute.id("main"), attribute.class("container")], [
         html.hgroup([], [
           html.h1([], [html.text("Soli share")]),
@@ -17,16 +27,32 @@ pub fn index() {
             html.text(" approach"),
           ]),
         ]),
+        html.hr([]),
         html.form([], [
-          html.label([], [
-            html.text(" Amount in cents"),
-            html.input([
-              attribute("aria-label", "Number"),
-              attribute.placeholder("Amount"),
-              attribute.name("number"),
-              attribute.type_("number"),
-            ]),
-          ]),
+          field_input(
+            form,
+            soli_form.name_field_name,
+            kind: "text",
+            label: " Name ",
+            attributes: [
+              attribute("aria-label", "Session name"),
+              attribute.placeholder("Name"),
+              attribute.required(True),
+            ],
+          ),
+          field_input(
+            form,
+            soli_form.amount_in_cent_field_name,
+            kind: "number",
+            label: " Amount in €",
+            attributes: [
+              attribute("aria-label", "Amount in cent"),
+              attribute.placeholder("0.00 €"),
+              attribute.required(True),
+              attribute.min("0"),
+              attribute.step("0.01"),
+            ],
+          ),
           html.button(
             [
               hx.push_url(True),
@@ -34,11 +60,64 @@ pub fn index() {
               hx.target(hx.Selector("#main")),
               hx.post("/share/new"),
             ],
-            [html.text(" Create soli share ")],
+            [html.text(" Create soli share session ")],
           ),
         ]),
+        html.hr([]),
+        keyed.ul(
+          [],
+          list.map(sessions, fn(session) {
+            let session_data = session
+            #(
+              session.id,
+              html.li([], [
+                html.text("Name: "),
+                html.strong([], [html.text(session_data.name)]),
+                html.text(" Id: "),
+                html.a([attribute.href("/share/" <> session_data.id)], [
+                  html.text(session_data.id),
+                ]),
+                html.text(
+                  " Amount: "
+                  <> float.to_string(
+                    int.to_float(session_data.amount_in_cent) /. 100.0,
+                  )
+                  <> " €",
+                ),
+              ]),
+            )
+          }),
+        ),
       ]),
     ]),
+  ])
+}
+
+fn field_input(
+  form: Form(t),
+  name name: String,
+  kind kind: String,
+  label label_text: String,
+  attributes attributes: List(attribute.Attribute(a)),
+) -> element.Element(a) {
+  let errors = form.field_error_messages(form, name) |> echo
+
+  html.label([], [
+    // The label text, for the user to read
+    html.text(label_text),
+    // The input, for the user to type into
+    html.input([
+      attribute.type_(kind),
+      attribute.name(name),
+      attribute.value(form.field_value(form, name)),
+      case errors {
+        [] -> attribute.none()
+        _ -> attribute.aria_invalid("true")
+      },
+      ..attributes
+    ]),
+    // Any errors presented below
+    ..list.map(errors, fn(msg) { html.small([], [element.text(msg)]) })
   ])
 }
 
@@ -50,6 +129,24 @@ fn head() -> element.Element(a) {
       attribute.name("viewport"),
     ]),
     html.meta([attribute.content("light"), attribute.name("color-scheme")]),
+    //  * 204 No Content by default does nothing, but is not an error
+    //  * 2xx, 3xx and 422 responses are non-errors and are swapped
+    //  * 4xx & 5xx responses are not swapped and are errors
+    //  * all other responses are swapped using "..." as a catch-all
+    html.meta([
+      attribute.name("htmx-config"),
+      attribute.content(
+        "{
+            \"responseHandling\":[
+                {\"code\":\"204\", \"swap\": false},
+                {\"code\":\"[23]..\", \"swap\": true},
+                {\"code\":\"422\", \"swap\": true},
+                {\"code\":\"[45]..\", \"swap\": false, \"error\":true},
+                {\"code\":\"...\", \"swap\": true}
+            ]
+        }",
+      ),
+    ]),
     html.link([
       attribute.href("/static/pico.pink.css"),
       attribute.rel("stylesheet"),
@@ -59,15 +156,23 @@ fn head() -> element.Element(a) {
   ])
 }
 
-pub fn share(id: String, amount: Int) {
+pub fn share(id: String, session: session_store.Session) {
   html.html([attribute.lang("en")], [
     head(),
     html.body([hx.boost(True)], [
       html.main([attribute.id("main"), attribute.class("container")], [
         html.hgroup([], [
           html.h1([], [html.text("New soli share created")]),
-          html.p([], [html.text("Split " <> int.to_string(amount) <> " cents")]),
+          html.h3([], [html.text("Name: " <> session.name)]),
+          html.p([], [
+            html.text(
+              "Split "
+              <> float.to_string(int.to_float(session.amount_in_cent) /. 100.0)
+              <> " €",
+            ),
+          ]),
         ]),
+        html.hr([]),
         html.p([], [html.strong([], [html.text("Id: ")]), html.text(id)]),
       ]),
     ]),

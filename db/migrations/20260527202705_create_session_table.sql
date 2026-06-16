@@ -3,7 +3,8 @@ PRAGMA journal_mode = WAL;
 
 CREATE TABLE session (
   id TEXT PRIMARY KEY,
-  amount_in_cent INTEGER NOT NULL
+  amount_in_cent INTEGER NOT NULL,
+  name TEXT
 );
 
 -- migrate:down

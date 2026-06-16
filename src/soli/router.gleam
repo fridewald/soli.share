@@ -1,9 +1,10 @@
+import formal/form
 import gleam/erlang/process.{type Subject}
 import gleam/http
-import gleam/int
 import gleam/list
 import gleam/result
 import lustre/element
+import soli/form as soli_form
 import soli/pages
 import soli/session_store
 import soli/web
@@ -15,7 +16,7 @@ pub fn handle_request(req: Request, ctx: web.Context) -> Response {
   // Apply the middleware stack for this request/response.
   use req <- web.middleware(req, ctx)
   case wisp.path_segments(req) {
-    [] -> home_page(req)
+    [] -> home_page(req, ctx.subject)
     ["share", "new"] -> create_new_share(req, ctx.subject)
     ["share", id] -> show_share(req, id, ctx.subject)
     // This matches all other paths.
@@ -28,15 +29,19 @@ fn create_new_share(
   sub: Subject(session_store.Message),
 ) -> Response {
   use formdata <- wisp.require_form(req)
-  // use <- wisp.require_method(req, http.Post)
-  let amount_result =
-    list.key_find(formdata.values, "number") |> result.try(int.parse)
-  case amount_result {
-    Ok(amount) -> {
-      let session_id = session_store.new(sub, amount)
+  let form = soli_form.create_session_form() |> form.add_values(formdata.values)
+  case form.run(form) {
+    Ok(data) -> {
+      let session_id = session_store.new(sub, data.amount_in_cent, data.name)
       wisp.redirect(to: "/share/" <> session_id)
     }
-    Error(_) -> wisp.bad_request("Invalid form fill in amount field")
+    Error(form) -> {
+      let sessions = session_store.get_sessions(sub)
+
+      pages.index(form, unwrap_sessions(sessions))
+      |> element.to_document_string
+      |> wisp.html_response(422)
+    }
   }
 }
 
@@ -51,7 +56,7 @@ fn show_share(
 
   let html =
     case session {
-      Ok(session) -> pages.share(id, session.amount_in_cent)
+      Ok(session) -> pages.share(id, session)
       Error(err) -> {
         echo err
         pages.not_found()
@@ -63,12 +68,28 @@ fn show_share(
   |> wisp.html_body(html)
 }
 
-fn home_page(req: Request) -> Response {
+fn home_page(req: Request, sub: Subject(session_store.Message)) -> Response {
   use <- wisp.require_method(req, http.Get)
+  // empty form
+  let form = soli_form.create_session_form()
+
+  let sessions = session_store.get_sessions(sub)
+
   let html =
-    pages.index()
+    pages.index(form, unwrap_sessions(sessions))
     |> element.to_document_string
 
   wisp.ok()
   |> wisp.html_body(html)
+}
+
+fn unwrap_sessions(
+  sessions: Result(List(session_store.Session), session_store.SessionError),
+) -> List(session_store.Session) {
+  sessions
+  |> result.map_error(fn(er) {
+    echo er
+    er
+  })
+  |> result.unwrap(list.new())
 }

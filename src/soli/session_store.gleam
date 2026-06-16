@@ -1,5 +1,6 @@
 import gleam/erlang/process.{type Subject}
 import gleam/list
+import gleam/option
 import gleam/otp/actor.{type Next, type StartError, type Started, InitFailed}
 import gleam/otp/supervision
 import gleam/result
@@ -9,7 +10,7 @@ import sqlight
 import youid/uuid
 
 pub type Session {
-  Session(id: String, amount_in_cent: Int)
+  Session(id: String, amount_in_cent: Int, name: String)
 }
 
 pub type SessionStore {
@@ -21,19 +22,28 @@ pub type SessionError {
   GenericError
 }
 
-// dict.Dict(String, Session)
 
 pub type Message {
   Get(reply_to: Subject(Result(Session, SessionError)), id: String)
-  New(reply_to: Subject(String), amount_in_cent: Int)
+  GetStore(reply_to: Subject(SessionStore))
+  GetSessions(reply_to: Subject(Result(List(Session), SessionError)))
+  New(reply_to: Subject(String), amount_in_cent: Int, name: String)
 }
 
-pub fn new(sub: Subject(Message), amount_in_cent: Int) -> String {
-  actor.call(sub, waiting: 20, sending: New(_, amount_in_cent))
+pub fn new(sub: Subject(Message), amount_in_cent: Int, name: String) -> String {
+  actor.call(sub, waiting: 20, sending: New(_, amount_in_cent, name))
 }
 
 pub fn get(sub: Subject(Message), id: String) {
   actor.call(sub, waiting: 20, sending: Get(_, id))
+}
+
+pub fn get_sessions(sub: Subject(Message)) {
+  actor.call(sub, waiting: 20, sending: GetSessions)
+}
+
+pub fn get_store(sub: Subject(Message)) {
+  actor.call(sub, waiting: 20, sending: GetStore)
 }
 
 pub fn static_actor_child(
@@ -46,7 +56,7 @@ fn start(
   name: process.Name(Message),
 ) -> Result(Started(Subject(Message)), StartError) {
   use connection <- result.try(
-    sqlight.open("file:db/soli_share.sqlite3")
+    sqlight.open("file:db/soli.sqlite3")
     |> result.map_error(fn(_) { InitFailed("") }),
   )
   actor.new(SessionStore(connection))
@@ -80,9 +90,10 @@ pub fn handle_message(
       actor.send(reply_to, session)
       actor.continue(session_store)
     }
-    New(reply_to, amount_in_cent) -> {
+    New(reply_to, amount_in_cent, name) -> {
       let id = uuid.v4_string()
-      let #(sql, with, expecting) = sql.create_session(id:, amount_in_cent:)
+      let #(sql, with, expecting) =
+        sql.create_session(id:, amount_in_cent:, name: option.Some(name))
       let with = list.map(with, parrot_to_sqlight)
       let _ =
         sqlight.query(
@@ -94,11 +105,46 @@ pub fn handle_message(
       actor.send(reply_to, id)
       actor.continue(session_store)
     }
+    GetStore(reply_to:) -> {
+      actor.send(reply_to, session_store)
+      actor.continue(session_store)
+    }
+    GetSessions(reply_to:) -> {
+      let #(sql, with, expecting) = sql.get_sessions()
+      let with = list.map(with, parrot_to_sqlight)
+      let sessions =
+        sqlight.query(
+          sql,
+          on: session_store.connection,
+          with:,
+          expecting: expecting,
+        )
+
+      actor.send(
+        reply_to,
+        sessions
+          |> result.map(list.map(_, get_sessions_to_session))
+          |> result.replace_error(GenericError),
+      )
+      actor.continue(session_store)
+    }
   }
 }
 
 fn get_session_to_session(get_session: sql.GetSession) -> Session {
-  Session(get_session.id, get_session.amount_in_cent)
+  Session(
+    get_session.id,
+    get_session.amount_in_cent,
+    get_session.name |> option.unwrap(""),
+  )
+}
+
+fn get_sessions_to_session(get_session: sql.GetSessions) -> Session {
+  Session(
+    get_session.id,
+    get_session.amount_in_cent,
+    get_session.name |> option.unwrap(""),
+  )
 }
 
 fn parrot_to_sqlight(param: dev.Param) -> sqlight.Value {

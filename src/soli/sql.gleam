@@ -6,33 +6,59 @@ import gleam/option.{type Option}
 import parrot/dev
 
 pub type GetSession {
-  GetSession(id: String, amount_in_cent: Int)
+  GetSession(id: String, amount_in_cent: Int, name: Option(String))
 }
 
 pub fn get_session(id id: String) {
-  let sql = "SELECT id, amount_in_cent FROM session WHERE id = ? LIMIT 1"
+  let sql = "SELECT id, amount_in_cent, name FROM session WHERE id = ? LIMIT 1"
   #(sql, [dev.ParamString(id)], get_session_decoder())
 }
 
 pub fn get_session_decoder() -> decode.Decoder(GetSession) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
-  decode.success(GetSession(id:, amount_in_cent:))
+  use name <- decode.field(2, decode.optional(decode.string))
+  decode.success(GetSession(id:, amount_in_cent:, name:))
+}
+
+pub type GetSessions {
+  GetSessions(id: String, amount_in_cent: Int, name: Option(String))
+}
+
+pub fn get_sessions() {
+  let sql = "SELECT id, amount_in_cent, name FROM session"
+  #(sql, [], get_sessions_decoder())
+}
+
+pub fn get_sessions_decoder() -> decode.Decoder(GetSessions) {
+  use id <- decode.field(0, decode.string)
+  use amount_in_cent <- decode.field(1, decode.int)
+  use name <- decode.field(2, decode.optional(decode.string))
+  decode.success(GetSessions(id:, amount_in_cent:, name:))
 }
 
 pub type CreateSession {
-  CreateSession(id: String, amount_in_cent: Int)
+  CreateSession(id: String, amount_in_cent: Int, name: Option(String))
 }
 
-pub fn create_session(id id: String, amount_in_cent amount_in_cent: Int) {
+pub fn create_session(
+  id id: String,
+  amount_in_cent amount_in_cent: Int,
+  name name: Option(String),
+) {
   let sql =
     "INSERT INTO session (
  id,
- amount_in_cent
-) VALUES (?, ?) RETURNING id, amount_in_cent"
+ amount_in_cent,
+ name
+) VALUES (?, ?, ?) RETURNING id, amount_in_cent, name"
   #(
     sql,
-    [dev.ParamString(id), dev.ParamInt(amount_in_cent)],
+    [
+      dev.ParamString(id),
+      dev.ParamInt(amount_in_cent),
+      dev.ParamNullable(option.map(name, fn(v) { dev.ParamString(v) })),
+    ],
     create_session_decoder(),
   )
 }
@@ -40,5 +66,6 @@ pub fn create_session(id id: String, amount_in_cent amount_in_cent: Int) {
 pub fn create_session_decoder() -> decode.Decoder(CreateSession) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
-  decode.success(CreateSession(id:, amount_in_cent:))
+  use name <- decode.field(2, decode.optional(decode.string))
+  decode.success(CreateSession(id:, amount_in_cent:, name:))
 }
