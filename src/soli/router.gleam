@@ -6,6 +6,7 @@ import gleam/result
 import lustre/element
 import soli/form as soli_form
 import soli/pages
+import soli/participate_form
 import soli/session_store
 import soli/web
 import wisp.{type Request, type Response}
@@ -19,9 +20,33 @@ pub fn handle_request(req: Request, ctx: web.Context) -> Response {
     [] -> home_page(req, ctx.subject)
     ["share", "new"] -> create_new_share(req, ctx.subject)
     ["share", id] -> show_share(req, id, ctx.subject)
+    ["share", id, "participate"] -> participate(req, id, ctx.subject)
     // This matches all other paths.
     _ -> wisp.not_found()
   }
+}
+
+fn participate(
+  req: Request,
+  id: String,
+  subject: Subject(session_store.Message),
+) -> Response {
+  use <- wisp.require_method(req, http.Get)
+
+  let session = session_store.get(subject, id)
+
+  let html =
+    case session {
+      Ok(session) -> pages.participate(session)
+      Error(err) -> {
+        echo err
+        pages.not_found()
+      }
+    }
+    |> element.to_document_string
+
+  wisp.created()
+  |> wisp.html_body(html)
 }
 
 fn create_new_share(
