@@ -69,3 +69,54 @@ pub fn create_session_decoder() -> decode.Decoder(CreateSession) {
   use name <- decode.field(2, decode.optional(decode.string))
   decode.success(CreateSession(id:, amount_in_cent:, name:))
 }
+
+pub fn new_participation(
+  id id: String,
+  session_id session_id: String,
+  amount_in_cent amount_in_cent: Int,
+  participant_name participant_name: Option(String),
+) {
+  let sql =
+    "INSERT INTO participation (
+  id ,
+  session_id ,
+  amount_in_cent,
+  participant_name)
+ VALUES (?, ?, ?, ?)"
+  #(sql, [
+    dev.ParamString(id),
+    dev.ParamString(session_id),
+    dev.ParamInt(amount_in_cent),
+    dev.ParamNullable(
+      option.map(participant_name, fn(v) { dev.ParamString(v) }),
+    ),
+  ])
+}
+
+pub type GetParticipation {
+  GetParticipation(
+    id: String,
+    session_id: String,
+    amount_in_cent: Int,
+    participant_name: Option(String),
+  )
+}
+
+pub fn get_participation(session_id session_id: String) {
+  let sql =
+    "SELECT id, session_id, amount_in_cent, participant_name FROM participation p  WHERE p.session_id = ?"
+  #(sql, [dev.ParamString(session_id)], get_participation_decoder())
+}
+
+pub fn get_participation_decoder() -> decode.Decoder(GetParticipation) {
+  use id <- decode.field(0, decode.string)
+  use session_id <- decode.field(1, decode.string)
+  use amount_in_cent <- decode.field(2, decode.int)
+  use participant_name <- decode.field(3, decode.optional(decode.string))
+  decode.success(GetParticipation(
+    id:,
+    session_id:,
+    amount_in_cent:,
+    participant_name:,
+  ))
+}

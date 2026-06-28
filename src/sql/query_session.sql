@@ -11,3 +11,15 @@ INSERT INTO session (
  amount_in_cent,
  name
 ) VALUES (?, ?, ?) RETURNING *;
+
+-- name: NewParticipation :exec
+INSERT INTO participation (
+  id ,
+  session_id ,
+  amount_in_cent,
+  participant_name)
+ VALUES (?, ?, ?, ?);
+
+
+-- name: GetParticipation :many
+SELECT * FROM participation p  WHERE p.session_id = ?;

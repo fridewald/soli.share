@@ -7,8 +7,8 @@ import lustre/attribute.{attribute}
 import lustre/element
 import lustre/element/html
 import lustre/element/keyed
-import soli/form as soli_form
-import soli/participate_form
+import soli/form/new_participation_form
+import soli/form/new_soli_session_form
 import soli/session_store
 
 fn body(elements: List(element.Element(a))) -> element.Element(a) {
@@ -64,14 +64,15 @@ fn head() -> element.Element(a) {
 fn main(main_element: List(element.Element(a))) -> element.Element(a) {
   body([
     html.main([attribute.id("main"), attribute.class("container")], [
+      // [],
       html.nav([], [
         // html.ul([], [html.li([], [html.strong([], [html.text("Soli")])])]),
-        html.ul([], []),
-        html.ul([], [
-          html.li([], [
-            html.a([attribute.href("/")], [html.text("Home")]),
-          ]),
-        ]),
+      // html.ul([], []),
+      // html.ul([], [
+      //   html.li([], [
+      //     html.a([attribute.href("/")], [html.text("Home")]),
+      //   ]),
+      // ]),
       ]),
       ..main_element
     ]),
@@ -79,7 +80,7 @@ fn main(main_element: List(element.Element(a))) -> element.Element(a) {
 }
 
 pub fn index(
-  form: Form(soli_form.CreateSession),
+  form: Form(new_soli_session_form.CreateSession),
   sessions: List(session_store.Session),
 ) {
   main([
@@ -94,7 +95,7 @@ pub fn index(
     html.form([], [
       field_input(
         form,
-        soli_form.name_field_name,
+        new_soli_session_form.name_field_name,
         kind: "text",
         label: " Name ",
         attributes: [
@@ -105,7 +106,7 @@ pub fn index(
       ),
       field_input(
         form,
-        soli_form.amount_in_cent_field_name,
+        new_soli_session_form.amount_in_cent_field_name,
         kind: "number",
         label: " Amount in €",
         attributes: [
@@ -119,7 +120,7 @@ pub fn index(
       html.button(
         [
           hx.push_url(True),
-          hx.include(hx.Selector("#main")),
+          hx.select("#main"),
           hx.target(hx.Selector("#main")),
           hx.post("/share/new"),
         ],
@@ -182,7 +183,7 @@ fn field_input(
   ])
 }
 
-pub fn share(id: String, session: session_store.Session) {
+pub fn soli_session(id: String, session: session_store.Session) {
   main([
     html.hgroup([], [
       html.h1([], [html.text("Soli ")]),
@@ -200,7 +201,7 @@ pub fn share(id: String, session: session_store.Session) {
       [
         hx.push_url(True),
         hx.get("/share/" <> id <> "/participate"),
-        hx.include(hx.Selector("#main")),
+        hx.select("#main"),
         hx.target(hx.Selector("#main")),
       ],
       [
@@ -212,10 +213,9 @@ pub fn share(id: String, session: session_store.Session) {
 }
 
 pub fn participate(
-  // form: Form(participate_form.Participate),
+  form: Form(new_participation_form.Participation),
   session: session_store.Session,
 ) {
-  let form = participate_form.create_participate_form()
   main([
     html.hgroup([], [
       html.text("Want to participate in " <> session.name <> "?"),
@@ -223,7 +223,7 @@ pub fn participate(
     html.form([], [
       field_input(
         form,
-        soli_form.name_field_name,
+        new_soli_session_form.name_field_name,
         kind: "text",
         label: " Name ",
         attributes: [
@@ -234,7 +234,7 @@ pub fn participate(
       ),
       field_input(
         form,
-        soli_form.amount_in_cent_field_name,
+        new_soli_session_form.amount_in_cent_field_name,
         kind: "number",
         label: " Amount in €",
         attributes: [
@@ -248,7 +248,7 @@ pub fn participate(
       html.button(
         [
           hx.push_url(True),
-          hx.include(hx.Selector("#main")),
+          hx.select("#main"),
           hx.target(hx.Selector("#main")),
           hx.post("/share/" <> session.id <> "/participate"),
         ],
