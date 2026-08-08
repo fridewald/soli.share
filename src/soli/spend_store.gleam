@@ -7,33 +7,28 @@ import gleam/otp/actor.{type Next, type StartError, type Started, InitFailed}
 import gleam/otp/supervision
 import gleam/result
 import parrot/dev
-import soli/form/new_participation_form
+import soli/form/new_pledge_form
 import soli/sql
 import sqlight
 import youid/uuid
 
-pub type Session {
-  Session(
-    id: String,
-    amount_in_cent: Int,
-    name: String,
-    participation: List(Participation),
-  )
+pub type Spend {
+  Spend(id: String, amount_in_cent: Int, name: String, pledges: List(Pledge))
 }
 
-pub type Participation
+pub type Pledge
 
-pub type SessionStore {
-  SessionStore(connection: sqlight.Connection)
+pub type SpendStore {
+  SpendStore(connection: sqlight.Connection)
 }
 
-pub type SessionError {
+pub type SpendError {
   SqlError(sqlight.Error)
   GenericError
 }
 
-pub fn print_session_error(session_error: SessionError) {
-  case session_error {
+pub fn print_spend_error(spend_error: SpendError) {
+  case spend_error {
     SqlError(sql_err) ->
       "SqlError(code:"
       <> sql_err.code |> sqlight.error_code_to_int() |> int.to_string()
@@ -45,11 +40,11 @@ pub fn print_session_error(session_error: SessionError) {
 }
 
 pub type Message {
-  Get(reply_to: Subject(Result(Session, SessionError)), id: String)
-  GetSessions(reply_to: Subject(Result(List(Session), SessionError)))
+  Get(reply_to: Subject(Result(Spend, SpendError)), id: String)
+  GetSpends(reply_to: Subject(Result(List(Spend), SpendError)))
   New(reply_to: Subject(String), amount_in_cent: Int, name: String)
-  NewParticipation(
-    reply_to: Subject(Result(Nil, SessionError)),
+  NewPledge(
+    reply_to: Subject(Result(Nil, SpendError)),
     id: String,
     amount_in_cent: Int,
     participant_name: String,
@@ -60,22 +55,20 @@ pub fn new(sub: Subject(Message), amount_in_cent: Int, name: String) -> String {
   actor.call(sub, waiting: 20, sending: New(_, amount_in_cent, name))
 }
 
-pub fn get(sub: Subject(Message), id: String) -> Result(Session, SessionError) {
+pub fn get(sub: Subject(Message), id: String) -> Result(Spend, SpendError) {
   actor.call(sub, waiting: 20, sending: Get(_, id))
 }
 
-pub fn get_sessions(
-  sub: Subject(Message),
-) -> Result(List(Session), SessionError) {
-  actor.call(sub, waiting: 20, sending: GetSessions)
+pub fn get_spends(sub: Subject(Message)) -> Result(List(Spend), SpendError) {
+  actor.call(sub, waiting: 20, sending: GetSpends)
 }
 
-pub fn add_participant(
+pub fn add_pledge(
   sub: Subject(Message),
   id: String,
-  data: new_participation_form.Participation,
-) -> Result(Nil, SessionError) {
-  actor.call(sub, waiting: 20, sending: NewParticipation(
+  data: new_pledge_form.Pledge,
+) -> Result(Nil, SpendError) {
+  actor.call(sub, waiting: 20, sending: NewPledge(
     _,
     id:,
     amount_in_cent: data.amount_in_cent,
@@ -96,25 +89,25 @@ fn start(
     sqlight.open("file:db/soli.sqlite3")
     |> result.map_error(fn(_) { InitFailed("") }),
   )
-  actor.new(SessionStore(connection))
+  actor.new(SpendStore(connection))
   |> actor.on_message(handle_message)
   |> actor.named(name)
   |> actor.start()
 }
 
 pub fn handle_message(
-  session_store: SessionStore,
+  spend_store: SpendStore,
   message: Message,
-) -> Next(SessionStore, Message) {
+) -> Next(SpendStore, Message) {
   case message {
     Get(reply_to, id) -> {
       // retrieve data and send back
-      let #(sql, with, expecting) = sql.get_session(id:)
+      let #(sql, with, expecting) = sql.get_spend(id:)
       let with = list.map(with, parrot_to_sqlight)
-      let session =
+      let spend =
         sqlight.query(
           sql,
-          on: session_store.connection,
+          on: spend_store.connection,
           with:,
           expecting: expecting,
         )
@@ -122,48 +115,48 @@ pub fn handle_message(
         |> result.try(fn(res) {
           list.first(res) |> result.replace_error(GenericError)
         })
-        |> result.map(get_session_to_session)
+        |> result.map(get_spend_to_spend)
 
-      actor.send(reply_to, session)
-      actor.continue(session_store)
+      actor.send(reply_to, spend)
+      actor.continue(spend_store)
     }
     New(reply_to, amount_in_cent, name) -> {
       let id = uuid.v4_string()
       let #(sql, with, expecting) =
-        sql.create_session(id:, amount_in_cent:, name: option.Some(name))
+        sql.create_spend(id:, amount_in_cent:, name: option.Some(name))
       let with = list.map(with, parrot_to_sqlight)
       let _ =
         sqlight.query(
           sql,
-          on: session_store.connection,
+          on: spend_store.connection,
           with:,
           expecting: expecting,
         )
       actor.send(reply_to, id)
-      actor.continue(session_store)
+      actor.continue(spend_store)
     }
-    GetSessions(reply_to:) -> {
-      let #(sql, with, expecting) = sql.get_sessions()
+    GetSpends(reply_to:) -> {
+      let #(sql, with, expecting) = sql.get_spends()
       let with = list.map(with, parrot_to_sqlight)
-      let sessions =
+      let spends =
         sqlight.query(
           sql,
-          on: session_store.connection,
+          on: spend_store.connection,
           with:,
           expecting: expecting,
         )
 
       actor.send(
         reply_to,
-        sessions
-          |> result.map(list.map(_, get_sessions_to_session))
+        spends
+          |> result.map(list.map(_, get_spends_to_spend))
           |> result.map_error(SqlError),
       )
-      actor.continue(session_store)
+      actor.continue(spend_store)
     }
-    NewParticipation(reply_to:, id:, amount_in_cent:, participant_name:) -> {
+    NewPledge(reply_to:, id:, amount_in_cent:, participant_name:) -> {
       let #(sql, with) =
-        sql.new_participation(
+        sql.new_pledge(
           id: "test",
           session_id: id,
           amount_in_cent:,
@@ -174,7 +167,7 @@ pub fn handle_message(
       let res =
         sqlight.query(
           sql,
-          on: session_store.connection,
+          on: spend_store.connection,
           with:,
           expecting: decode.dynamic,
         )
@@ -184,25 +177,25 @@ pub fn handle_message(
           |> result.replace(Nil)
           |> result.map_error(SqlError),
       )
-      actor.continue(session_store)
+      actor.continue(spend_store)
     }
   }
 }
 
-fn get_session_to_session(get_session: sql.GetSession) -> Session {
-  Session(
-    get_session.id,
-    get_session.amount_in_cent,
-    get_session.name |> option.unwrap(""),
+fn get_spend_to_spend(get_spend: sql.GetSpend) -> Spend {
+  Spend(
+    get_spend.id,
+    get_spend.amount_in_cent,
+    get_spend.name |> option.unwrap(""),
     [],
   )
 }
 
-fn get_sessions_to_session(get_session: sql.GetSessions) -> Session {
-  Session(
-    get_session.id,
-    get_session.amount_in_cent,
-    get_session.name |> option.unwrap(""),
+fn get_spends_to_spend(get_spend: sql.GetSpends) -> Spend {
+  Spend(
+    get_spend.id,
+    get_spend.amount_in_cent,
+    get_spend.name |> option.unwrap(""),
     [],
   )
 }

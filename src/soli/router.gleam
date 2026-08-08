@@ -7,10 +7,10 @@ import gleam/io
 import gleam/list
 import gleam/result
 import lustre/element
-import soli/form/new_participation_form
-import soli/form/new_soli_session_form
+import soli/form/new_pledge_form
+import soli/form/new_spend_form
 import soli/pages
-import soli/session_store
+import soli/spend_store
 import soli/web
 import wisp.{type Request, type Response}
 
@@ -21,64 +21,64 @@ pub fn handle_request(req: Request, ctx: web.Context) -> Response {
   use req <- web.middleware(req, ctx)
   case wisp.path_segments(req) {
     [] -> get_home_page(req, ctx.subject)
-    ["share", "new"] -> create_new_share(req, ctx.subject)
-    ["share", id] -> get_session_page(req, id, ctx.subject)
-    ["share", id, "participate"] -> participate(req, id, ctx.subject)
+    ["share", "new"] -> create_spend(req, ctx.subject)
+    ["share", id] -> get_spend_page(req, id, ctx.subject)
+    ["share", id, "pledge"] -> pledge(req, id, ctx.subject)
     // This matches all other paths.
     _ -> wisp.not_found()
   }
 }
 
-fn participate(
+fn pledge(
   req: Request,
   id: String,
-  subject: Subject(session_store.Message),
+  subject: Subject(spend_store.Message),
 ) -> response.Response(wisp.Body) {
   case req.method {
     http.Get -> {
       // empty form
-      let form = new_participation_form.create_participate_form()
-      get_participate(id, form, subject)
+      let form = new_pledge_form.create_pledge_form()
+      get_pledge(id, form, subject)
     }
-    http.Post -> post_participate(req, id, subject)
+    http.Post -> post_pledge(req, id, subject)
     _ -> wisp.method_not_allowed(allowed: [http.Get, http.Post])
   }
 }
 
-fn post_participate(
+fn post_pledge(
   req: request.Request(wisp.Connection),
   id: String,
-  sub: Subject(session_store.Message),
+  sub: Subject(spend_store.Message),
 ) -> response.Response(wisp.Body) {
   use formdata <- wisp.require_form(req)
 
-  let participation_form =
-    new_participation_form.create_participate_form()
+  let pledge_form =
+    new_pledge_form.create_pledge_form()
     |> form.add_values(formdata.values)
-  case form.run(participation_form) {
+  case form.run(pledge_form) {
     Ok(data) -> {
-      case session_store.add_participant(sub, id, data) {
+      case spend_store.add_pledge(sub, id, data) {
         Ok(_) -> wisp.redirect(to: "/share/" <> id)
-        Error(session_error) -> {
+        Error(spend_error) -> {
           io.println_error(
-            "database error" <> session_store.print_session_error(session_error),
+            "database error" <> spend_store.print_spend_error(spend_error),
           )
           wisp.internal_server_error()
         }
       }
     }
-    Error(form) -> get_participate(id, form, sub)
+    Error(form) -> get_pledge(id, form, sub)
   }
 }
 
-fn get_participate(
+fn get_pledge(
   id: String,
-  form: form.Form(new_participation_form.Participation),
-  subject: Subject(session_store.Message),
+  form: form.Form(new_pledge_form.Pledge),
+  subject: Subject(spend_store.Message),
 ) -> Response {
   let html =
-    case session_store.get(subject, id) {
-      Ok(session) -> pages.participate(form, session)
+    case spend_store.get(subject, id) {
+      Ok(spend) -> pages.pledge(form, spend)
       Error(err) -> {
         echo err
         pages.not_found()
@@ -90,42 +90,39 @@ fn get_participate(
   |> wisp.html_body(html)
 }
 
-fn create_new_share(
-  req: Request,
-  sub: Subject(session_store.Message),
-) -> Response {
+fn create_spend(req: Request, sub: Subject(spend_store.Message)) -> Response {
   use formdata <- wisp.require_form(req)
 
   let form =
-    new_soli_session_form.create_session_form()
+    new_spend_form.create_spend_form()
     |> form.add_values(formdata.values)
   case form.run(form) {
     Ok(data) -> {
-      let session_id = session_store.new(sub, data.amount_in_cent, data.name)
-      wisp.redirect(to: "/share/" <> session_id)
+      let spend_id = spend_store.new(sub, data.amount_in_cent, data.name)
+      wisp.redirect(to: "/share/" <> spend_id)
     }
     Error(form) -> {
-      let sessions = session_store.get_sessions(sub)
+      let spends = spend_store.get_spends(sub)
 
-      pages.index(form, unwrap_sessions(sessions))
+      pages.index(form, unwrap_spends(spends))
       |> element.to_document_string
       |> wisp.html_response(422)
     }
   }
 }
 
-fn get_session_page(
+fn get_spend_page(
   req: Request,
   id: String,
-  sub: Subject(session_store.Message),
+  sub: Subject(spend_store.Message),
 ) -> Response {
   use <- wisp.require_method(req, http.Get)
 
-  let session = session_store.get(sub, id)
+  let spend = spend_store.get(sub, id)
 
   let html =
-    case session {
-      Ok(session) -> pages.soli_session(id, session)
+    case spend {
+      Ok(spend) -> pages.spend(id, spend)
       Error(err) -> {
         echo err
         pages.not_found()
@@ -137,28 +134,25 @@ fn get_session_page(
   |> wisp.html_body(html)
 }
 
-fn get_home_page(
-  req: Request,
-  sub: Subject(session_store.Message),
-) -> Response {
+fn get_home_page(req: Request, sub: Subject(spend_store.Message)) -> Response {
   use <- wisp.require_method(req, http.Get)
   // empty form
-  let form = new_soli_session_form.create_session_form()
+  let form = new_spend_form.create_spend_form()
 
-  let sessions = session_store.get_sessions(sub)
+  let spends = spend_store.get_spends(sub)
 
   let html =
-    pages.index(form, unwrap_sessions(sessions))
+    pages.index(form, unwrap_spends(spends))
     |> element.to_document_string
 
   wisp.ok()
   |> wisp.html_body(html)
 }
 
-fn unwrap_sessions(
-  sessions: Result(List(session_store.Session), session_store.SessionError),
-) -> List(session_store.Session) {
-  sessions
+fn unwrap_spends(
+  spends: Result(List(spend_store.Spend), spend_store.SpendError),
+) -> List(spend_store.Spend) {
+  spends
   |> result.map_error(fn(er) {
     echo er
     er

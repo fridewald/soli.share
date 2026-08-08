@@ -1,18 +1,18 @@
--- name: GetSession :one
+-- name: GetSpend :one
 SELECT * FROM session WHERE id = ? LIMIT 1;
 
--- name: GetSessions :many
+-- name: GetSpends :many
 SELECT * FROM session;
 
 
--- name: CreateSession :one
+-- name: CreateSpend :one
 INSERT INTO session (
  id,
  amount_in_cent,
  name
 ) VALUES (?, ?, ?) RETURNING *;
 
--- name: NewParticipation :exec
+-- name: NewPledge :exec
 INSERT INTO participation (
   id ,
   session_id ,
@@ -21,5 +21,5 @@ INSERT INTO participation (
  VALUES (?, ?, ?, ?);
 
 
--- name: GetParticipation :many
+-- name: GetPledges :many
 SELECT * FROM participation p  WHERE p.session_id = ?;

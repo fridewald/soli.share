@@ -5,43 +5,43 @@ import gleam/dynamic/decode
 import gleam/option.{type Option}
 import parrot/dev
 
-pub type GetSession {
-  GetSession(id: String, amount_in_cent: Int, name: Option(String))
+pub type GetSpend {
+  GetSpend(id: String, amount_in_cent: Int, name: Option(String))
 }
 
-pub fn get_session(id id: String) {
+pub fn get_spend(id id: String) {
   let sql = "SELECT id, amount_in_cent, name FROM session WHERE id = ? LIMIT 1"
-  #(sql, [dev.ParamString(id)], get_session_decoder())
+  #(sql, [dev.ParamString(id)], get_spend_decoder())
 }
 
-pub fn get_session_decoder() -> decode.Decoder(GetSession) {
+pub fn get_spend_decoder() -> decode.Decoder(GetSpend) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
   use name <- decode.field(2, decode.optional(decode.string))
-  decode.success(GetSession(id:, amount_in_cent:, name:))
+  decode.success(GetSpend(id:, amount_in_cent:, name:))
 }
 
-pub type GetSessions {
-  GetSessions(id: String, amount_in_cent: Int, name: Option(String))
+pub type GetSpends {
+  GetSpends(id: String, amount_in_cent: Int, name: Option(String))
 }
 
-pub fn get_sessions() {
+pub fn get_spends() {
   let sql = "SELECT id, amount_in_cent, name FROM session"
-  #(sql, [], get_sessions_decoder())
+  #(sql, [], get_spends_decoder())
 }
 
-pub fn get_sessions_decoder() -> decode.Decoder(GetSessions) {
+pub fn get_spends_decoder() -> decode.Decoder(GetSpends) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
   use name <- decode.field(2, decode.optional(decode.string))
-  decode.success(GetSessions(id:, amount_in_cent:, name:))
+  decode.success(GetSpends(id:, amount_in_cent:, name:))
 }
 
-pub type CreateSession {
-  CreateSession(id: String, amount_in_cent: Int, name: Option(String))
+pub type CreateSpend {
+  CreateSpend(id: String, amount_in_cent: Int, name: Option(String))
 }
 
-pub fn create_session(
+pub fn create_spend(
   id id: String,
   amount_in_cent amount_in_cent: Int,
   name name: Option(String),
@@ -59,18 +59,18 @@ pub fn create_session(
       dev.ParamInt(amount_in_cent),
       dev.ParamNullable(option.map(name, fn(v) { dev.ParamString(v) })),
     ],
-    create_session_decoder(),
+    create_spend_decoder(),
   )
 }
 
-pub fn create_session_decoder() -> decode.Decoder(CreateSession) {
+pub fn create_spend_decoder() -> decode.Decoder(CreateSpend) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
   use name <- decode.field(2, decode.optional(decode.string))
-  decode.success(CreateSession(id:, amount_in_cent:, name:))
+  decode.success(CreateSpend(id:, amount_in_cent:, name:))
 }
 
-pub fn new_participation(
+pub fn new_pledge(
   id id: String,
   session_id session_id: String,
   amount_in_cent amount_in_cent: Int,
@@ -93,8 +93,8 @@ pub fn new_participation(
   ])
 }
 
-pub type GetParticipation {
-  GetParticipation(
+pub type GetPledges {
+  GetPledges(
     id: String,
     session_id: String,
     amount_in_cent: Int,
@@ -102,18 +102,18 @@ pub type GetParticipation {
   )
 }
 
-pub fn get_participation(session_id session_id: String) {
+pub fn get_pledges(session_id session_id: String) {
   let sql =
     "SELECT id, session_id, amount_in_cent, participant_name FROM participation p  WHERE p.session_id = ?"
-  #(sql, [dev.ParamString(session_id)], get_participation_decoder())
+  #(sql, [dev.ParamString(session_id)], get_pledges_decoder())
 }
 
-pub fn get_participation_decoder() -> decode.Decoder(GetParticipation) {
+pub fn get_pledges_decoder() -> decode.Decoder(GetPledges) {
   use id <- decode.field(0, decode.string)
   use session_id <- decode.field(1, decode.string)
   use amount_in_cent <- decode.field(2, decode.int)
   use participant_name <- decode.field(3, decode.optional(decode.string))
-  decode.success(GetParticipation(
+  decode.success(GetPledges(
     id:,
     session_id:,
     amount_in_cent:,

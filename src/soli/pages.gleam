@@ -7,9 +7,9 @@ import lustre/attribute.{attribute}
 import lustre/element
 import lustre/element/html
 import lustre/element/keyed
-import soli/form/new_participation_form
-import soli/form/new_soli_session_form
-import soli/session_store
+import soli/form/new_pledge_form
+import soli/form/new_spend_form
+import soli/spend_store
 
 fn body(elements: List(element.Element(a))) -> element.Element(a) {
   html.html([attribute.lang("en")], [
@@ -80,8 +80,8 @@ fn main(main_element: List(element.Element(a))) -> element.Element(a) {
 }
 
 pub fn index(
-  form: Form(new_soli_session_form.CreateSession),
-  sessions: List(session_store.Session),
+  form: Form(new_spend_form.CreateSpend),
+  spends: List(spend_store.Spend),
 ) {
   main([
     html.hgroup([], [
@@ -95,18 +95,18 @@ pub fn index(
     html.form([], [
       field_input(
         form,
-        new_soli_session_form.name_field_name,
+        new_spend_form.name_field_name,
         kind: "text",
         label: " Name ",
         attributes: [
-          attribute("aria-label", "Session name"),
+          attribute("aria-label", "Spend name"),
           attribute.placeholder("Name"),
           attribute.required(True),
         ],
       ),
       field_input(
         form,
-        new_soli_session_form.amount_in_cent_field_name,
+        new_spend_form.amount_in_cent_field_name,
         kind: "number",
         label: " Amount in €",
         attributes: [
@@ -124,27 +124,27 @@ pub fn index(
           hx.target(hx.Selector("#main")),
           hx.post("/share/new"),
         ],
-        [html.text(" Create soli share session ")],
+        [html.text(" Create Spend ")],
       ),
     ]),
     html.hr([]),
     keyed.ul(
       [],
-      list.map(sessions, fn(session) {
-        let session_data = session
+      list.map(spends, fn(spend) {
+        let spend_data = spend
         #(
-          session.id,
+          spend.id,
           html.li([], [
             html.text("Name: "),
-            html.strong([], [html.text(session_data.name)]),
+            html.strong([], [html.text(spend_data.name)]),
             html.text(" Id: "),
-            html.a([attribute.href("/share/" <> session_data.id)], [
-              html.text(session_data.id),
+            html.a([attribute.href("/share/" <> spend_data.id)], [
+              html.text(spend_data.id),
             ]),
             html.text(
               " Amount: "
               <> float.to_string(
-                int.to_float(session_data.amount_in_cent) /. 100.0,
+                int.to_float(spend_data.amount_in_cent) /. 100.0,
               )
               <> " €",
             ),
@@ -183,15 +183,15 @@ fn field_input(
   ])
 }
 
-pub fn soli_session(id: String, session: session_store.Session) {
+pub fn spend(id: String, spend: spend_store.Spend) {
   main([
     html.hgroup([], [
       html.h1([], [html.text("Soli ")]),
-      html.h3([], [html.text("Name: " <> session.name)]),
+      html.h3([], [html.text("Name: " <> spend.name)]),
       html.p([], [
         html.text(
           "Split "
-          <> float.to_string(int.to_float(session.amount_in_cent) /. 100.0)
+          <> float.to_string(int.to_float(spend.amount_in_cent) /. 100.0)
           <> " €",
         ),
       ]),
@@ -200,30 +200,27 @@ pub fn soli_session(id: String, session: session_store.Session) {
     html.button(
       [
         hx.push_url(True),
-        hx.get("/share/" <> id <> "/participate"),
+        hx.get("/share/" <> id <> "/pledge"),
         hx.select("#main"),
         hx.target(hx.Selector("#main")),
       ],
       [
-        html.text("Participate"),
+        html.text("Pledge"),
       ],
     ),
     // html.p([], [html.strong([], [html.text("Id: ")]), html.text(id)]),
   ])
 }
 
-pub fn participate(
-  form: Form(new_participation_form.Participation),
-  session: session_store.Session,
-) {
+pub fn pledge(form: Form(new_pledge_form.Pledge), spend: spend_store.Spend) {
   main([
     html.hgroup([], [
-      html.text("Want to participate in " <> session.name <> "?"),
+      html.text("Want to pledge to " <> spend.name <> "?"),
     ]),
     html.form([], [
       field_input(
         form,
-        new_soli_session_form.name_field_name,
+        new_pledge_form.name_field_name,
         kind: "text",
         label: " Name ",
         attributes: [
@@ -234,7 +231,7 @@ pub fn participate(
       ),
       field_input(
         form,
-        new_soli_session_form.amount_in_cent_field_name,
+        new_pledge_form.amount_in_cent_field_name,
         kind: "number",
         label: " Amount in €",
         attributes: [
@@ -250,9 +247,9 @@ pub fn participate(
           hx.push_url(True),
           hx.select("#main"),
           hx.target(hx.Selector("#main")),
-          hx.post("/share/" <> session.id <> "/participate"),
+          hx.post("/share/" <> spend.id <> "/pledge"),
         ],
-        [html.text(" Participate in \"" <> session.name <> "\"")],
+        [html.text(" Pledge to \"" <> spend.name <> "\"")],
       ),
     ]),
   ])
