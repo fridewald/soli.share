@@ -16,8 +16,16 @@ fn body(elements: List(element.Element(a))) -> element.Element(a) {
     head(),
     html.header([], [
       html.div([attribute.class("container")], [
-        html.a([attribute.href("/")], [
-          html.h3([], [html.text("Soli")]),
+        html.a([attribute.href("/"), attribute.style("text-decoration", "none")], [
+          html.h3([], [
+            html.img([
+              attribute.style("height", "1em"),
+              attribute.style("vertical-align", "-0.05em"),
+              attribute.src("/static/favicon.png"),
+            ]),
+            html.text(" "),
+            html.text("Soli"),
+          ]),
         ]),
       ]),
     ]),
