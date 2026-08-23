@@ -4,13 +4,17 @@ import gleam/otp/actor
 import gleam/otp/static_supervisor.{type Supervisor} as supervisor
 import mist
 import soli/router
-import soli/spend_store
+import soli/spending_store
 import soli/web.{Context}
 import wisp
 import wisp/wisp_mist
 
 pub fn main() -> Nil {
-  io.println("Hello from soli_share!")
+  start("")
+}
+
+pub fn start(hostname: String) -> Nil {
+  io.println("Hello from soli!")
 
   // Wisp Setup
   wisp.configure_logger()
@@ -18,12 +22,12 @@ pub fn main() -> Nil {
   // load this from somewhere so that it is not regenerated on every restart.
   let secret_key_base = wisp.random_string(64)
 
-  let process_name = process.new_name("spend_store")
+  let process_name = process.new_name("spending_store")
   let subject = process.named_subject(process_name)
 
   let _ = start_supervisor(process_name)
 
-  let ctx = Context(static_directory: static_directory(), subject:)
+  let ctx = Context(static_directory: static_directory(), subject:, hostname:)
 
   let handler = router.handle_request(_, ctx)
 
@@ -38,10 +42,10 @@ pub fn main() -> Nil {
 }
 
 fn start_supervisor(
-  process_name: process.Name(spend_store.Message),
+  process_name: process.Name(spending_store.Message),
 ) -> actor.StartResult(Supervisor) {
   supervisor.new(supervisor.OneForOne)
-  |> supervisor.add(spend_store.static_actor_child(process_name))
+  |> supervisor.add(spending_store.static_actor_child(process_name))
   |> supervisor.start()
 }
 

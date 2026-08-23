@@ -6,5 +6,5 @@ pub fn main() {
     radiate.new()
     |> radiate.add_dir("src")
     |> radiate.start()
-  soli.main()
+  soli.start("http://localhost:8000")
 }

@@ -5,87 +5,109 @@ import gleam/dynamic/decode
 import gleam/option.{type Option}
 import parrot/dev
 
-pub type GetSpend {
-  GetSpend(id: String, amount_in_cent: Int, name: Option(String))
+pub type GetSpending {
+  GetSpending(
+    id: String,
+    amount_in_cent: Int,
+    name: Option(String),
+    manage_key: String,
+  )
 }
 
-pub fn get_spend(id id: String) {
-  let sql = "SELECT id, amount_in_cent, name FROM session WHERE id = ? LIMIT 1"
-  #(sql, [dev.ParamString(id)], get_spend_decoder())
+pub fn get_spending(id id: String) {
+  let sql =
+    "SELECT id, amount_in_cent, name, manage_key FROM spending WHERE id = ? LIMIT 1"
+  #(sql, [dev.ParamString(id)], get_spending_decoder())
 }
 
-pub fn get_spend_decoder() -> decode.Decoder(GetSpend) {
+pub fn get_spending_decoder() -> decode.Decoder(GetSpending) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
   use name <- decode.field(2, decode.optional(decode.string))
-  decode.success(GetSpend(id:, amount_in_cent:, name:))
+  use manage_key <- decode.field(3, decode.string)
+  decode.success(GetSpending(id:, amount_in_cent:, name:, manage_key:))
 }
 
-pub type GetSpends {
-  GetSpends(id: String, amount_in_cent: Int, name: Option(String))
+pub type GetSpendings {
+  GetSpendings(
+    id: String,
+    amount_in_cent: Int,
+    name: Option(String),
+    manage_key: String,
+  )
 }
 
-pub fn get_spends() {
-  let sql = "SELECT id, amount_in_cent, name FROM session"
-  #(sql, [], get_spends_decoder())
+pub fn get_spendings() {
+  let sql = "SELECT id, amount_in_cent, name, manage_key FROM spending"
+  #(sql, [], get_spendings_decoder())
 }
 
-pub fn get_spends_decoder() -> decode.Decoder(GetSpends) {
+pub fn get_spendings_decoder() -> decode.Decoder(GetSpendings) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
   use name <- decode.field(2, decode.optional(decode.string))
-  decode.success(GetSpends(id:, amount_in_cent:, name:))
+  use manage_key <- decode.field(3, decode.string)
+  decode.success(GetSpendings(id:, amount_in_cent:, name:, manage_key:))
 }
 
-pub type CreateSpend {
-  CreateSpend(id: String, amount_in_cent: Int, name: Option(String))
+pub type CreateSpending {
+  CreateSpending(
+    id: String,
+    amount_in_cent: Int,
+    name: Option(String),
+    manage_key: String,
+  )
 }
 
-pub fn create_spend(
+pub fn create_spending(
   id id: String,
   amount_in_cent amount_in_cent: Int,
   name name: Option(String),
+  manage_key manage_key: String,
 ) {
   let sql =
-    "INSERT INTO session (
+    "INSERT INTO spending (
  id,
  amount_in_cent,
- name
-) VALUES (?, ?, ?) RETURNING id, amount_in_cent, name"
+ name,
+ manage_key
+) VALUES (?, ?, ?, ?) RETURNING id, amount_in_cent, name, manage_key"
   #(
     sql,
     [
       dev.ParamString(id),
       dev.ParamInt(amount_in_cent),
       dev.ParamNullable(option.map(name, fn(v) { dev.ParamString(v) })),
+      dev.ParamString(manage_key),
     ],
-    create_spend_decoder(),
+    create_spending_decoder(),
   )
 }
 
-pub fn create_spend_decoder() -> decode.Decoder(CreateSpend) {
+pub fn create_spending_decoder() -> decode.Decoder(CreateSpending) {
   use id <- decode.field(0, decode.string)
   use amount_in_cent <- decode.field(1, decode.int)
   use name <- decode.field(2, decode.optional(decode.string))
-  decode.success(CreateSpend(id:, amount_in_cent:, name:))
+  use manage_key <- decode.field(3, decode.string)
+  decode.success(CreateSpending(id:, amount_in_cent:, name:, manage_key:))
 }
 
 pub fn new_pledge(
   id id: String,
-  session_id session_id: String,
+  spending_id spending_id: String,
   amount_in_cent amount_in_cent: Int,
   participant_name participant_name: Option(String),
 ) {
   let sql =
     "INSERT INTO participation (
   id ,
-  session_id ,
+  spending_id ,
   amount_in_cent,
   participant_name)
  VALUES (?, ?, ?, ?)"
   #(sql, [
     dev.ParamString(id),
-    dev.ParamString(session_id),
+    dev.ParamString(spending_id),
     dev.ParamInt(amount_in_cent),
     dev.ParamNullable(
       option.map(participant_name, fn(v) { dev.ParamString(v) }),
@@ -96,26 +118,26 @@ pub fn new_pledge(
 pub type GetPledges {
   GetPledges(
     id: String,
-    session_id: String,
+    spending_id: String,
     amount_in_cent: Int,
     participant_name: Option(String),
   )
 }
 
-pub fn get_pledges(session_id session_id: String) {
+pub fn get_pledges(spending_id spending_id: String) {
   let sql =
-    "SELECT id, session_id, amount_in_cent, participant_name FROM participation p  WHERE p.session_id = ?"
-  #(sql, [dev.ParamString(session_id)], get_pledges_decoder())
+    "SELECT id, spending_id, amount_in_cent, participant_name FROM participation p  WHERE p.spending_id = ?"
+  #(sql, [dev.ParamString(spending_id)], get_pledges_decoder())
 }
 
 pub fn get_pledges_decoder() -> decode.Decoder(GetPledges) {
   use id <- decode.field(0, decode.string)
-  use session_id <- decode.field(1, decode.string)
+  use spending_id <- decode.field(1, decode.string)
   use amount_in_cent <- decode.field(2, decode.int)
   use participant_name <- decode.field(3, decode.optional(decode.string))
   decode.success(GetPledges(
     id:,
-    session_id:,
+    spending_id:,
     amount_in_cent:,
     participant_name:,
   ))

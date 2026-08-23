@@ -8,9 +8,9 @@ import gleam/list
 import gleam/result
 import lustre/element
 import soli/form/new_pledge_form
-import soli/form/new_spend_form
+import soli/form/new_spending_form
 import soli/pages
-import soli/spend_store
+import soli/spending_store
 import soli/web
 import wisp.{type Request, type Response}
 
@@ -21,18 +21,60 @@ pub fn handle_request(req: Request, ctx: web.Context) -> Response {
   use req <- web.middleware(req, ctx)
   case wisp.path_segments(req) {
     [] -> get_home_page(req, ctx.subject)
-    ["share", "new"] -> create_spend(req, ctx.subject)
-    ["share", id] -> get_spend_page(req, id, ctx.subject)
-    ["share", id, "pledge"] -> pledge(req, id, ctx.subject)
+    ["spending", "new"] -> create_spending(req, ctx.subject)
+    ["spending", id, ..spending_path] ->
+      handle_spending(req, id, spending_path, ctx)
     // This matches all other paths.
     _ -> wisp.not_found()
   }
 }
 
-fn pledge(
+fn handle_spending(
+  req: request.Request(wisp.Connection),
+  id: String,
+  spending_path: List(String),
+  ctx: web.Context,
+) -> response.Response(wisp.Body) {
+  let subject = ctx.subject
+  case spending_path {
+    [] -> get_spending_page(req, id, subject)
+    ["pledge"] -> handle_pledge(req, id, subject)
+    ["manage", key] -> get_manage_page(req, id, key, ctx)
+    _ -> wisp.not_found()
+  }
+}
+
+fn get_manage_page(
+  req: request.Request(wisp.Connection),
+  id: String,
+  key: String,
+  ctx: web.Context,
+) -> response.Response(wisp.Body) {
+  let sub = ctx.subject
+  use <- wisp.require_method(req, http.Get)
+
+  let spending = spending_store.get(sub, id)
+
+  let html =
+    case spending {
+      Ok(spending) if spending.manage_key == key ->
+        pages.manage(id, spending, ctx.hostname, key)
+      Ok(_) -> todo
+      Error(err) -> {
+        echo err
+        pages.not_found()
+      }
+    }
+    |> element.to_document_string
+
+  wisp.ok()
+  |> wisp.html_body(html)
+}
+
+fn handle_pledge(
   req: Request,
   id: String,
-  subject: Subject(spend_store.Message),
+  subject: Subject(spending_store.Message),
 ) -> response.Response(wisp.Body) {
   case req.method {
     http.Get -> {
@@ -48,7 +90,7 @@ fn pledge(
 fn post_pledge(
   req: request.Request(wisp.Connection),
   id: String,
-  sub: Subject(spend_store.Message),
+  sub: Subject(spending_store.Message),
 ) -> response.Response(wisp.Body) {
   use formdata <- wisp.require_form(req)
 
@@ -57,11 +99,13 @@ fn post_pledge(
     |> form.add_values(formdata.values)
   case form.run(pledge_form) {
     Ok(data) -> {
-      case spend_store.add_pledge(sub, id, data) {
-        Ok(_) -> wisp.redirect(to: "/share/" <> id)
-        Error(spend_error) -> {
+      case spending_store.add_pledge(sub, id, data) {
+        Ok(_) ->
+          wisp.redirect(to: "/spending/" <> id <> "/pledge" <> "/pledge_id")
+        Error(spending_error) -> {
           io.println_error(
-            "database error" <> spend_store.print_spend_error(spend_error),
+            "database error"
+            <> spending_store.print_spending_error(spending_error),
           )
           wisp.internal_server_error()
         }
@@ -74,11 +118,11 @@ fn post_pledge(
 fn get_pledge(
   id: String,
   form: form.Form(new_pledge_form.Pledge),
-  subject: Subject(spend_store.Message),
+  subject: Subject(spending_store.Message),
 ) -> Response {
   let html =
-    case spend_store.get(subject, id) {
-      Ok(spend) -> pages.pledge(form, spend)
+    case spending_store.get(subject, id) {
+      Ok(spending) -> pages.pledge(form, spending)
       Error(err) -> {
         echo err
         pages.not_found()
@@ -90,39 +134,49 @@ fn get_pledge(
   |> wisp.html_body(html)
 }
 
-fn create_spend(req: Request, sub: Subject(spend_store.Message)) -> Response {
+fn create_spending(
+  req: Request,
+  sub: Subject(spending_store.Message),
+) -> Response {
   use formdata <- wisp.require_form(req)
 
   let form =
-    new_spend_form.create_spend_form()
+    new_spending_form.create_spending_form()
     |> form.add_values(formdata.values)
   case form.run(form) {
     Ok(data) -> {
-      let spend_id = spend_store.new(sub, data.amount_in_cent, data.name)
-      wisp.redirect(to: "/share/" <> spend_id)
+      let new_spending = spending_store.new(sub, data.amount_in_cent, data.name)
+      case new_spending {
+        Ok(spending) -> {
+          wisp.redirect(
+            to: "/spending/" <> spending.id <> "/manage/" <> spending.manage_key,
+          )
+        }
+        Error(_) -> wisp.internal_server_error()
+      }
     }
     Error(form) -> {
-      let spends = spend_store.get_spends(sub)
+      let spendings = spending_store.get_spendings(sub)
 
-      pages.index(form, unwrap_spends(spends))
+      pages.index(form, unwrap_spendings(spendings))
       |> element.to_document_string
       |> wisp.html_response(422)
     }
   }
 }
 
-fn get_spend_page(
+fn get_spending_page(
   req: Request,
   id: String,
-  sub: Subject(spend_store.Message),
+  sub: Subject(spending_store.Message),
 ) -> Response {
   use <- wisp.require_method(req, http.Get)
 
-  let spend = spend_store.get(sub, id)
+  let spending = spending_store.get(sub, id)
 
   let html =
-    case spend {
-      Ok(spend) -> pages.spend(id, spend)
+    case spending {
+      Ok(spending) -> pages.spending(id, spending)
       Error(err) -> {
         echo err
         pages.not_found()
@@ -134,25 +188,28 @@ fn get_spend_page(
   |> wisp.html_body(html)
 }
 
-fn get_home_page(req: Request, sub: Subject(spend_store.Message)) -> Response {
+fn get_home_page(
+  req: Request,
+  sub: Subject(spending_store.Message),
+) -> Response {
   use <- wisp.require_method(req, http.Get)
   // empty form
-  let form = new_spend_form.create_spend_form()
+  let form = new_spending_form.create_spending_form()
 
-  let spends = spend_store.get_spends(sub)
+  let spendings = spending_store.get_spendings(sub)
 
   let html =
-    pages.index(form, unwrap_spends(spends))
+    pages.index(form, unwrap_spendings(spendings))
     |> element.to_document_string
 
   wisp.ok()
   |> wisp.html_body(html)
 }
 
-fn unwrap_spends(
-  spends: Result(List(spend_store.Spend), spend_store.SpendError),
-) -> List(spend_store.Spend) {
-  spends
+fn unwrap_spendings(
+  spendings: Result(List(spending_store.Spending), spending_store.SpendingError),
+) -> List(spending_store.Spending) {
+  spendings
   |> result.map_error(fn(er) {
     echo er
     er

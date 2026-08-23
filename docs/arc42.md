@@ -73,7 +73,7 @@ Motivation
 
 Contained Building Blocks
 
-:   - **Router** (`soli/router.gleam`) — maps requests to handlers: home (`/`), create a Spend (`/share/new`), view a Spend (`/share/:id`), submit a Pledge (`/share/:id/pledge`).
+:   - **Router** (`soli/router.gleam`) — maps requests to handlers: home (`/`), create a Spend (`/spend/new`), view a Spend (`/spend/:id`), submit a Pledge (`/spend/:id/pledge`).
     - **Web/Middleware** (`soli/web.gleam`) — shared request pipeline: static file serving, CSRF protection, crash rescue, request logging.
     - **Pages** (`soli/pages.gleam`) — renders each screen's HTML.
     - **Forms** (`soli/form/*.gleam`) — `formal`-based validation for creating a Spend and submitting a Pledge. `update_spend_form.gleam` and `update_pledge_form.gleam` exist as empty stubs — editing isn't implemented yet.
@@ -85,7 +85,7 @@ Important Interfaces
 :   - HTTP (`wisp`/`mist`) is the only inbound interface.
     - `SpendStore`'s `Message` type is the only way into persistence — no other module touches `sqlight` directly.
 
-**Naming note:** the code's own module, type, and function names now follow `CONTEXT.md`'s glossary (**Spend** / **Pledge**). The underlying SQLite tables and columns (`session`, `participation`, `session_id`, `participant_name`) are left as-is as infrastructure-only vocabulary — see Risks and Technical Debts below.
+**Naming note:** the code's own module, type, and function names now follow `CONTEXT.md`'s glossary (**Spending** / **Pledge**). The underlying SQLite tables and columns (`session`, `participation`, `session_id`, `participant_name`) are left as-is as infrastructure-only vocabulary — see Risks and Technical Debts below.
 
 ### \<Name black box 1\> {#_name_black_box_1}
 
@@ -149,9 +149,9 @@ Important Interfaces
 
 ## Create a Spend and collect Pledges {#_create_a_spend_and_collect_pledges}
 
-1. Creator submits the "new Spend" form → `router.create_spend` validates it via `new_spend_form`, calls `spend_store.new`, which sends `New` to the actor → the actor inserts a row and returns the new Spend's id.
-2. A participant opens the Share Link (`/share/:id`) → `get_spend_page` fetches the Spend via `Get` and renders it with `pages.spend`.
-3. A participant submits a Pledge (`/share/:id/pledge`) → validated via `new_pledge_form`, sent to the actor as `NewPledge`, inserted via `sql.new_pledge`.
+1. Creator submits the "new Spend" form → `router.create_spending` validates it via `new_spend_form`, calls `spend_store.new`, which sends `New` to the actor → the actor inserts a row and returns the new Spend's id.
+2. A participant opens the Share Link (`/spending/:id`) → `get_spend_page` fetches the Spend via `Get` and renders it with `pages.spend`.
+3. A participant submits a Pledge (`/spending/:id/pledge`) → validated via `new_pledge_form`, sent to the actor as `NewPledge`, inserted via `sql.new_pledge`.
 
 Settlement (the Open → Unbalanced/Resolved transition) is not implemented yet — there's no message or handler for it in `SpendStore` today.
 

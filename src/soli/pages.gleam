@@ -8,8 +8,8 @@ import lustre/element
 import lustre/element/html
 import lustre/element/keyed
 import soli/form/new_pledge_form
-import soli/form/new_spend_form
-import soli/spend_store
+import soli/form/new_spending_form
+import soli/spending_store
 
 fn body(elements: List(element.Element(a))) -> element.Element(a) {
   html.html([attribute.lang("en")], [
@@ -57,6 +57,7 @@ fn head() -> element.Element(a) {
       attribute.rel("stylesheet"),
     ]),
     html.script([attribute.src("/static/htmx.min.js")], ""),
+    html.link([attribute.href("/static/favicon.png"), attribute.rel("icon")]),
     html.title([], "Soli"),
   ])
 }
@@ -80,8 +81,8 @@ fn main(main_element: List(element.Element(a))) -> element.Element(a) {
 }
 
 pub fn index(
-  form: Form(new_spend_form.CreateSpend),
-  spends: List(spend_store.Spend),
+  form: Form(new_spending_form.CreateSpending),
+  spendings: List(spending_store.Spending),
 ) {
   main([
     html.hgroup([], [
@@ -95,18 +96,18 @@ pub fn index(
     html.form([], [
       field_input(
         form,
-        new_spend_form.name_field_name,
+        new_spending_form.name_field_name,
         kind: "text",
         label: " Name ",
         attributes: [
-          attribute("aria-label", "Spend name"),
+          attribute("aria-label", "Spending name"),
           attribute.placeholder("Name"),
           attribute.required(True),
         ],
       ),
       field_input(
         form,
-        new_spend_form.amount_in_cent_field_name,
+        new_spending_form.amount_in_cent_field_name,
         kind: "number",
         label: " Amount in €",
         attributes: [
@@ -122,29 +123,29 @@ pub fn index(
           hx.push_url(True),
           hx.select("#main"),
           hx.target(hx.Selector("#main")),
-          hx.post("/share/new"),
+          hx.post("/spending/new"),
         ],
-        [html.text(" Create Spend ")],
+        [html.text(" Create Spending ")],
       ),
     ]),
     html.hr([]),
     keyed.ul(
       [],
-      list.map(spends, fn(spend) {
-        let spend_data = spend
+      list.map(spendings, fn(spending) {
+        let spending_data = spending
         #(
-          spend.id,
+          spending.id,
           html.li([], [
             html.text("Name: "),
-            html.strong([], [html.text(spend_data.name)]),
+            html.strong([], [html.text(spending_data.name)]),
             html.text(" Id: "),
-            html.a([attribute.href("/share/" <> spend_data.id)], [
-              html.text(spend_data.id),
+            html.a([attribute.href("/spending/" <> spending_data.id)], [
+              html.text(spending_data.id),
             ]),
             html.text(
               " Amount: "
               <> float.to_string(
-                int.to_float(spend_data.amount_in_cent) /. 100.0,
+                int.to_float(spending_data.amount_in_cent) /. 100.0,
               )
               <> " €",
             ),
@@ -183,15 +184,15 @@ fn field_input(
   ])
 }
 
-pub fn spend(id: String, spend: spend_store.Spend) {
+pub fn spending(id: String, spending: spending_store.Spending) {
   main([
     html.hgroup([], [
-      html.h1([], [html.text("Soli ")]),
-      html.h3([], [html.text("Name: " <> spend.name)]),
+      html.h2([], [html.text("Spending")]),
+      html.p([], [html.text("Name: "), html.b([], [html.text(spending.name)])]),
       html.p([], [
         html.text(
-          "Split "
-          <> float.to_string(int.to_float(spend.amount_in_cent) /. 100.0)
+          "Amount: "
+          <> float.to_string(int.to_float(spending.amount_in_cent) /. 100.0)
           <> " €",
         ),
       ]),
@@ -200,7 +201,7 @@ pub fn spend(id: String, spend: spend_store.Spend) {
     html.button(
       [
         hx.push_url(True),
-        hx.get("/share/" <> id <> "/pledge"),
+        hx.get(get_participate_link(id)),
         hx.select("#main"),
         hx.target(hx.Selector("#main")),
       ],
@@ -208,14 +209,60 @@ pub fn spend(id: String, spend: spend_store.Spend) {
         html.text("Pledge"),
       ],
     ),
-    // html.p([], [html.strong([], [html.text("Id: ")]), html.text(id)]),
   ])
 }
 
-pub fn pledge(form: Form(new_pledge_form.Pledge), spend: spend_store.Spend) {
+fn get_participate_link(id: String) -> String {
+  "/spending/" <> id <> "/pledge"
+}
+
+pub fn manage(
+  id: String,
+  spending: spending_store.Spending,
+  hostname: String,
+  key: String,
+) {
+  let manage_link = hostname <> "/spending/" <> id <> "/manage/" <> key
+  let public_link = hostname <> "/spending/" <> id
   main([
     html.hgroup([], [
-      html.text("Want to pledge to " <> spend.name <> "?"),
+      html.h2([], [html.text("Spending")]),
+      html.p([], [html.text("Name: "), html.b([], [html.text(spending.name)])]),
+      html.p([], [
+        html.text(
+          "Amount: "
+          <> float.to_string(int.to_float(spending.amount_in_cent) /. 100.0)
+          <> " €",
+        ),
+      ]),
+    ]),
+    html.hr([]),
+    html.p([], [
+      html.text("Manage link: "),
+      html.a([attribute.href(manage_link)], [
+        html.text(manage_link),
+      ]),
+    ]),
+    html.p([], [
+      html.text("Participate link: "),
+      html.a([attribute.href(public_link)], [
+        html.text(public_link),
+      ]),
+    ]),
+    html.p([], [
+      html.button([], [html.text("Settle")]),
+      html.button([], [html.text("Delete")]),
+    ]),
+  ])
+}
+
+pub fn pledge(
+  form: Form(new_pledge_form.Pledge),
+  spending: spending_store.Spending,
+) {
+  main([
+    html.hgroup([], [
+      html.text("Want to pledge to " <> spending.name <> "?"),
     ]),
     html.form([], [
       field_input(
@@ -247,9 +294,9 @@ pub fn pledge(form: Form(new_pledge_form.Pledge), spend: spend_store.Spend) {
           hx.push_url(True),
           hx.select("#main"),
           hx.target(hx.Selector("#main")),
-          hx.post("/share/" <> spend.id <> "/pledge"),
+          hx.post("/spending/" <> spending.id <> "/pledge"),
         ],
-        [html.text(" Pledge to \"" <> spend.name <> "\"")],
+        [html.text(" Pledge to \"" <> spending.name <> "\"")],
       ),
     ]),
   ])

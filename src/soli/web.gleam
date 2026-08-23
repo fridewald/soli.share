@@ -1,11 +1,12 @@
 import gleam/erlang/process
-import soli/spend_store
+import soli/spending_store
 import wisp
 
 pub type Context {
   Context(
     static_directory: String,
-    subject: process.Subject(spend_store.Message),
+    hostname: String,
+    subject: process.Subject(spending_store.Message),
   )
 }
 

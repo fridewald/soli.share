@@ -1,6 +1,10 @@
 # soli
 
-Share costs in a group in a pay as you think approach.
+Split costs in a group in a pay as you think approach.
+
+An user can and their spending in the web ui, they become the creator of the spending.
+Via a link each participant than pledges an amount they seem fit.
+The creator has a separate link to terminate the spending session.
 
 
 ## Development
@@ -8,6 +12,7 @@ Share costs in a group in a pay as you think approach.
 ```sh
 gleam run   # Run the project
 gleam test  # Run the tests
+gleam dev   # Run the dev-server
 ```
 
 ## Database integration

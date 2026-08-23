@@ -1,17 +1,18 @@
 CREATE TABLE IF NOT EXISTS "schema_migrations" (version varchar(128) primary key);
-CREATE TABLE session (
+CREATE TABLE spending (
   id TEXT PRIMARY KEY,
   amount_in_cent INTEGER NOT NULL,
-  name TEXT
+  name TEXT,
+  manage_key TEXT NOT NULL
 );
 CREATE TABLE participation (
   id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL,
+  spending_id TEXT NOT NULL,
   amount_in_cent INTEGER NOT NULL,
   participant_name TEXT,
-  CONSTRAINT fk_session FOREIGN KEY (session_id) REFERENCES session(id) ON DELETE CASCADE
+  CONSTRAINT fk_spending FOREIGN KEY (spending_id) REFERENCES spending(id) ON DELETE CASCADE
 );
-CREATE INDEX participation_session_index On participation(session_id);
+CREATE INDEX participation_spending_index On participation(spending_id);
 -- Dbmate schema migrations
 INSERT INTO "schema_migrations" (version) VALUES
   ('20260527202705'),
